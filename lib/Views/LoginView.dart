@@ -1,9 +1,10 @@
 // ignore_for_file: use_build_context_synchronously
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'package:mynotes/constants/routes.dart';
+import 'package:mynotes/services/auth/auth_exeptions.dart';
+import 'package:mynotes/services/auth/auth_service.dart';
 import 'package:mynotes/utilities/show_error_dialog.dart';
 
 class LoginView extends StatefulWidget {
@@ -57,45 +58,39 @@ class _LoginViewState extends State<LoginView> {
               final email = _email.text;
               final password = _password.text;
               try {
-                await FirebaseAuth.instance.signInWithEmailAndPassword(
+                await AuthService.firebase().logIn(
                   email: email,
                   password: password,
                 );
-                final user = FirebaseAuth.instance.currentUser;
-                if (user?.emailVerified ?? false){
+                final user = AuthService.firebase().currentUser;
+                if (user?.isEmailVerified ?? false) {
                   Navigator.of(context).pushNamedAndRemoveUntil(
-                  notesRoute,
-                  (_) => false,
-                );
-                }else{
+                    notesRoute,
+                    (_) => false,
+                  );
+                } else {
                   Navigator.of(context).pushNamedAndRemoveUntil(
-                  verifyEmailRoute,
-                  (_) => false,
-                );
+                    verifyEmailRoute,
+                    (_) => false,
+                  );
                 }
-              } on FirebaseAuthException catch (e) {
-                if (e.code == 'user-not-found') {
-                  await showErrorDialog(
+              } on UserNotFoundAuthExeption{
+                 await showErrorDialog(
                     context,
                     'User not found',
                   );
-                } else if(e.code =='wrong-password'){
-                  await showErrorDialog(
+              } on WrongPasswordAuthExeption{
+                await showErrorDialog(
                     context,
                     'Wrong password',
                   );
-                }else {
-                  await showErrorDialog(
+              } on GenericAuthExeption{
+                await showErrorDialog(
                     context,
-                    'Error : ${e.code}',
+                    'Authentication error',
                   );
-                } 
-              }catch (e) {
-                  await showErrorDialog(
-                    context,
-                    e.toString(),
-                  );
-                }
+              }
+              
             },
             child: const Text(
                 'Login'), // other sign in methods (Google): https://firebase.flutter.dev/docs/auth/usage/#other-sign-in-methods
@@ -112,5 +107,3 @@ class _LoginViewState extends State<LoginView> {
     );
   }
 }
-
-
