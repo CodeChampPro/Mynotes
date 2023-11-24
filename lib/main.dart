@@ -14,7 +14,7 @@ void main() {
     title: 'Flutter Demo',
     theme: ThemeData(
       colorScheme: ColorScheme.fromSeed(
-          seedColor: Color.fromARGB(255, 112, 6, 110)),
+          seedColor: const Color.fromARGB(255, 112, 6, 110)),
       useMaterial3: true,
     ),
     home: const HomePage(),
