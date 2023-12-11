@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:mynotes/extensions/list/filter.dart';
 import 'package:mynotes/services/crud/crud_exeptions.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path_provider/path_provider.dart';
@@ -11,32 +12,44 @@ class NotesService {
 
   List<DatabaseNote> _notes = [];
 
-  static final NotesService _shared = NotesService._sharedInstance();
-  NotesService._sharedInstance () {
-    _notesStreamController =
-      StreamController<List<DatabaseNote>>.broadcast(
-        onListen: () {
-          _notesStreamController.sink.add(_notes);
-        },
-      );}
-  
+  DatabaseUser? _user;
 
-  
+  static final NotesService _shared = NotesService._sharedInstance();
+  NotesService._sharedInstance() {
+    _notesStreamController = StreamController<List<DatabaseNote>>.broadcast(
+      onListen: () {
+        _notesStreamController.sink.add(_notes);
+      },
+    );
+  }
+
   factory NotesService() => _shared;
 
+  late final StreamController<List<DatabaseNote>> _notesStreamController;
 
-  late final StreamController<List<DatabaseNote>> _notesStreamController; 
-  
-  Stream<List<DatabaseNote>> get allNotes => _notesStreamController.stream;  
+  Stream<List<DatabaseNote>> get allNotes => _notesStreamController.stream.filter((note) {
+    final currentUser = _user;
+    if(currentUser != null ) {
+      return note.userId == currentUser.id;
+    }else{
+      throw UserShouldBesetBeforeReadingallNotes();
+    }
+  });
 
-  Future<DatabaseUser> getOrCreateUser({required String email})async {
+  Future<DatabaseUser> getOrCreateUser({required String email, bool setAsCurrentUser = true}) async {
     try {
-    final user = await getUser(email: email);
-    return user;
-    }on CouldNotFindUser{
+      final user = await getUser(email: email);
+      if (setAsCurrentUser){
+        _user = user;
+      }
+      return user;
+    } on CouldNotFindUser {
       final createdUser = await createUser(email: email);
+      if(setAsCurrentUser){
+        _user = createdUser;
+      }
       return createdUser;
-    }catch (e) {
+    } catch (e) {
       rethrow;
     }
   }
@@ -47,17 +60,21 @@ class NotesService {
     _notesStreamController.add(_notes);
   }
 
-  Future<DatabaseNote> updateNote({ 
+  Future<DatabaseNote> updateNote({
     required DatabaseNote note,
     required String text,
   }) async {
     await _ensureDbIsOpen();
     final db = _getDatabaseOrThrow();
     await getNote(id: note.id);
-    final updatescount = await db.update(notesTable, {
-      textColumn: text,
-      isSyncedColumn: 0,
-    });
+    final updatescount = await db.update(
+        notesTable,
+        {
+          textColumn: text,
+          isSyncedColumn: 0,
+        },
+        where: 'id = ?',
+        whereArgs: [note.id]);
 
     if (updatescount == 0) {
       throw CouldNotUpdateNote;
@@ -120,8 +137,8 @@ class NotesService {
     );
     if (deletedCcount == 0) {
       throw CouldNotDeleteNote();
-    }else{
-      _notes.removeWhere((note) => note.id ==id );
+    } else {
+      _notes.removeWhere((note) => note.id == id);
       _notesStreamController.add(_notes);
     }
   }
@@ -226,9 +243,9 @@ class NotesService {
   }
 
   Future<void> _ensureDbIsOpen() async {
-    try{
+    try {
       await open();
-    }on DatabaseAlreadyOpenExeption{
+    } on DatabaseAlreadyOpenExeption {
       //empty
     }
   }
@@ -320,7 +337,7 @@ const createUserTable = '''
       );
       ''';
 const createNoteTable = ''' 
-      CREATE TABLE IF NOT EXISTS "note" (
+      CREATE TABLE IF NOT EXIST "note" (
         "id"	INTEGER NOT NULL,
         "user_id"	INTEGER NOT NULL,
         "text"	TEXT,
