@@ -36,7 +36,8 @@ class NotesService {
     }
   });
 
-  Future<DatabaseUser> getOrCreateUser({required String email, bool setAsCurrentUser = true}) async {
+  Future<DatabaseUser> getOrCreateUser({required String email,
+   bool setAsCurrentUser = true,}) async {
     try {
       final user = await getUser(email: email);
       if (setAsCurrentUser){
